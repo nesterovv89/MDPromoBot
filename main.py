@@ -76,7 +76,7 @@ class ToState(StatesGroup):
 
 @dp.callback_query(StateFilter(None), F.data == 'mk')
 async def name(callback: CallbackQuery, state: FSMContext):
-    await callback.answer(text='Введите ваше имя:', show_alert=True)
+    await callback.message.answer(text='Введите ваше имя:', show_alert=True)
     await state.set_state(ToState.name)
 
 @dp.message(ToState.name)
@@ -123,7 +123,7 @@ class Pool(StatesGroup):
 
 @dp.callback_query(StateFilter(None), F.data == 'pool')
 async def name(callback: CallbackQuery, state: FSMContext):
-    await callback.answer(text='Чему сейчас обучается ваш ребенок?', show_alert=True)
+    await callback.message.answer(text='Чему сейчас обучается ваш ребенок?')
     await state.set_state(Pool.what)
 
 @dp.message(Pool.what)
