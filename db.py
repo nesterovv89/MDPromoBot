@@ -80,12 +80,12 @@ async def request(user_id, name, age, contact):
         except:
             return False
         
-async def pooling(user_id, what, age, wish):
+async def pooling(user_id, what, age):
     engine = create_async_engine('sqlite+aiosqlite:///bot.sqlite3')
     async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
     async with async_session() as session:
         try:
-            request = Pool(user_id=user_id, what=what, age=age, wish=wish)
+            request = Pool(user_id=user_id, what=what, age=age)
             session.add(request)
             await session.commit()
             return True
@@ -99,3 +99,15 @@ async def users():
         result = await session.execute(select(Profile.user_id))
         users = result.scalars().all()
         return [user for user in users]
+    
+async def check_user_existence(user_id):
+    engine = create_async_engine('sqlite+aiosqlite:///bot.sqlite3')
+    async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
+    async with async_session() as session:
+        # Проверяем наличие записи с заданным user_id
+        result = await session.execute(select(Pool).filter(Pool.user_id == user_id))
+        result = result.all()
+        if len(result) > 2:
+            return True
+        else:
+            return False

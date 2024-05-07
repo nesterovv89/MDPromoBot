@@ -2,12 +2,12 @@ import asyncio
 import logging
 import random
 
-from aiogram import Bot, Dispatcher, F, types, Router
+from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
 from aiogram.filters.command import Command
 from aiogram.fsm.storage.memory import MemoryStorage
 from dotenv import load_dotenv
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
 
 import keyboards as k
 import images as i
@@ -15,7 +15,7 @@ import texts as t
 import admin
 import re
 
-from aiogram import Bot, Dispatcher, F, Router
+from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ParseMode
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
@@ -24,8 +24,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import config
 from db import request
-from config import config
-from db import createtables, profile, pooling
+from db import createtables, profile, pooling, check_user_existence
 
 load_dotenv()
 
@@ -37,15 +36,15 @@ dp = Dispatcher()
 dp.include_routers(admin.router)
 logging.basicConfig(level=logging.INFO)
 #router = Router
-admin_ids = [375959767]
-recipes = [i.RECIPE_2, i.RECIPE_3]
+admin_ids = [375959767, 505958678, 314310391]
+#recipes = [i.RECIPE_2, i.RECIPE_3]
 #, 505958678, 314310391
 
 @dp.message(Command('start'))
 async def start(message: types.Message):
     name = message.from_user.full_name
-    text = t.CONGRATULATION
-    await message.answer_photo(photo=i.START, caption=f'{name}, {text}', reply_markup=k.keyboard, parse_mode=ParseMode.MARKDOWN)
+    #text = t.CONGRATULATION caption=f'{name}, {text}', 
+    await message.answer_photo(photo=i.START, reply_markup=k.keyboard, parse_mode=ParseMode.MARKDOWN)
     await profile(user_id=message.from_user.id, name=message.from_user.full_name, surname=message.from_user.last_name)
     #await message.answer_video(video=v.START_1)
     #await asyncio.sleep(4)
@@ -54,11 +53,11 @@ async def start(message: types.Message):
 
 @dp.callback_query(F.data == 'recipe')
 async def recipe(callback: types.CallbackQuery):
-    await callback.message.answer_video(video=i.RECIPE_1, reply_markup=k.keyboard_3) 
+    await callback.message.answer_video(video=i.HOW_VIDEO, reply_markup=k.keyboard_3) 
 
-@dp.callback_query(F.data == 'recipe_2')
-async def recipe_2(callback: types.CallbackQuery):
-    await callback.message.answer_video(video=random.choice(recipes), reply_markup=k.keyboard_3) 
+#@dp.callback_query(F.data == 'recipe_2')
+#async def recipe_2(callback: types.CallbackQuery):
+#    await callback.message.answer_video(video=random.choice(recipes), reply_markup=k.keyboard_3) 
 
 
 @dp.callback_query(F.data == 'mm')
@@ -72,89 +71,151 @@ async def main_menu(callback: CallbackQuery):
 class ToState(StatesGroup):
     name = State()
     age = State()
+    #method = State()
     comment = State()
+
 
 @dp.callback_query(StateFilter(None), F.data == 'mk')
 async def name(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer(text='Введите ваше имя:', show_alert=True)
+    keyboard = ReplyKeyboardMarkup(
+                keyboard=[
+                    [KeyboardButton(text='Главное меню')]
+                ],
+                resize_keyboard=True,
+                one_time_keyboard=True
+            )
+    await callback.message.answer(
+            text='Введите ваше имя:',
+            reply_markup=keyboard
+        )
     await state.set_state(ToState.name)
 
 @dp.message(ToState.name)
-async def age(callback: Message, state: FSMContext):
-    await state.update_data(name=callback.text.capitalize())
-    await callback.answer(
-        text='Укажите возраст ребёнка:', show_alert=True
-    )
-    await state.set_state(ToState.age)
+async def age(message: Message, state: FSMContext):
+    if message.text == 'Главное меню':
+        await start(message)
+        await state.set_state(None)
+    else:    
+        await state.update_data(name=message.text.capitalize())
+        await message.answer(
+            text='Укажите возраст ребёнка:',
+        )
+        await state.set_state(ToState.age)
 
 
 @dp.message(ToState.age)
-async def comment(callback: Message, state: FSMContext):
-    await state.update_data(age=callback.text.lower())
-    await callback.answer(
-        text='Укажите свой номер в формате "+00000000000"', show_alert=True
-    )
-    await state.set_state(ToState.comment)
+async def comment(message: Message, state: FSMContext):
+    keyboard = ReplyKeyboardMarkup(
+                keyboard=[
+                    [KeyboardButton(text='Главное меню')]
+                ],
+                resize_keyboard=True,
+                one_time_keyboard=True
+            )
+    if message.text == 'Главное меню':
+        await start(message)
+        await state.set_state(None)
+    else:
+        await state.update_data(age=message.text.lower())
+        await message.answer(
+            text='Укажите свой номер в формате "+00000000000"',
+            reply_markup=keyboard
+        )
+        await state.set_state(ToState.comment)
 
 @dp.message(ToState.comment)
-async def result(callback: Message, state: FSMContext):
-    if re.match(r'^\+?\d+$', callback.text):
-        await state.update_data(comment=callback.text.lower())
+async def result(message: Message, state: FSMContext):
+    if message.text == 'Главное меню':
+        await start(message)
+        await state.set_state(None)
+    elif re.match(r'^\+?\d+$', message.text):
+        k_2 = ReplyKeyboardRemove()
+        await state.update_data(comment=message.text.lower())
         user_data = await state.get_data()
-        await callback.answer(
+        await message.answer(
             text=f"Ваше имя ***{user_data['name']}***, возраст {user_data['age']}, контактный номер {user_data['comment']}\n"
                 f'С вами свяжутся в ближайшее время',
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=k_2
         )
-        text=f"Заявка с бота на МК: Имя {user_data['name']}, возраст {user_data['age']}, контактный номер {user_data['comment']}\n"
-        await request(user_id=callback.from_user.id, name=user_data['name'], age=user_data['age'], contact=user_data['comment'])
+        text=f"Заявка на МК: Имя {user_data['name']}, возраст {user_data['age']}, контактный номер {user_data['comment']}\n"
+        await request(user_id=message.from_user.id, name=user_data['name'], age=user_data['age'], contact=user_data['comment'])
         for admin in admin_ids:
             await bot.send_message(admin, text=text)
-        await start(callback)
-        await state.clear()
+        await start(message)
+        await state.set_state(None)
     else:
-        await callback.answer(text='Пожалуйста, введите свой номер в правильном формате.')
+        await message.answer(text='Пожалуйста, введите свой номер в правильном формате.')
 
 
 class Pool(StatesGroup):
     what = State()
+    custom_option = State()
     age = State()
     wish = State()
 
+
 @dp.callback_query(StateFilter(None), F.data == 'pool')
-async def name(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer(text='Чему сейчас обучается ваш ребенок?')
-    await state.set_state(Pool.what)
+async def name(callback: types.CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    if not await check_user_existence(user_id):
+        if callback.data == 'pool':
+            keyboard = ReplyKeyboardMarkup(
+                keyboard=[
+                    [KeyboardButton(text='Игры настольные, шахматы'), KeyboardButton(text='Архитектурный клуб, мастер-класс')],
+                    [KeyboardButton(text='Живопись, мастер-класс'), KeyboardButton(text='Йога-утро')],
+                    [KeyboardButton(text='Научные опыты'), KeyboardButton(text='Арт-терапия для детей')],
+                    [KeyboardButton(text='Коммуникационный тренинг'), KeyboardButton(text='Ваш вариант')],
+                    [KeyboardButton(text='Главное меню')],
+                ],
+                resize_keyboard=True,
+                one_time_keyboard=True,
+            )
+            await callback.message.answer('Какой формат мероприятий для вас интересен?', reply_markup=keyboard)
+            await state.set_state(Pool.what)
+    else:
+        keyboard_markup = ReplyKeyboardRemove()
+        await callback.message.answer(text=f'Вы уже проходили опрос.', reply_markup=keyboard_markup)
 
 @dp.message(Pool.what)
-async def age(callback: Message, state: FSMContext):
-    await state.update_data(what=callback.text.capitalize())
-    await callback.answer(
-        text='Укажите возраст ребёнка:',
-    )
-    await state.set_state(Pool.age)
+async def custom_option(message: types.Message, state: FSMContext):
+    #keyboard_markup = ReplyKeyboardRemove()
+    keyboard_mm = ReplyKeyboardMarkup(
+                keyboard=[
+                    [KeyboardButton(text='Главное меню')]
+                ],
+                resize_keyboard=True,
+                one_time_keyboard=True
+            )
+    if message.text == 'Главное меню':
+        await start(message)
+        await state.set_state(None)
+    elif message.text == 'Ваш вариант':
+        await message.answer('Введите ваш вариант:', reply_markup=keyboard_mm)
+        await state.set_state(Pool.what)
+    else: 
+        await state.update_data(what=message.text.capitalize())
+        await message.answer('Укажите возраст ребёнка:', reply_markup=keyboard_mm)
+        await state.set_state(Pool.age)
 
 @dp.message(Pool.age)
-async def comment(callback: Message, state: FSMContext):
-    await state.update_data(age=callback.text.lower())
-    await callback.answer(
-        text='Какой мастер-класс вы хотели бы посетить?',
-    )
-    await state.set_state(Pool.wish)
-
-@dp.message(Pool.wish)
-async def result(callback: Message, state: FSMContext):
-    await state.update_data(wish=callback.text.lower())
-    user_data = await state.get_data()
-    await callback.answer(
-        text='Благодарим Вас за участие в опросе! Ваше мнение очень важно для нас!'
-    )
-    text=f"Опрос: Сейчас посещает: {user_data['what']}, возраст: {user_data['age']}, Что бы хотели: {user_data['wish']}\n"
-    await pooling(user_id=callback.from_user.id, what=user_data['what'], age=user_data['age'], wish=user_data['wish'])
-    for admin in admin_ids:
-        await bot.send_message(admin, text=text)
-    await start(callback)
-    await state.clear()
+async def result(message: Message, state: FSMContext):
+    if message.text == 'Главное меню':
+        await start(message)
+        await state.set_state(None)
+    else:
+        await state.update_data(age=message.text.lower())
+        user_data = await state.get_data()
+        keyboard_markup = ReplyKeyboardRemove()
+        await message.answer(
+            text='Благодарим Вас за участие в опросе! Ваше мнение очень важно для нас!', reply_markup=keyboard_markup
+        )
+        text=f"Опрос: Желает посещать: {user_data['what']}, возраст: {user_data['age']}, id_tg: {message.from_user.id}\n"
+        await pooling(user_id=message.from_user.id, what=user_data['what'], age=user_data['age'])
+        for admin in admin_ids:
+            await bot.send_message(admin, text=text)
+        await start(message)
+        await state.clear()
 
 async def main():
     await createtables()
