@@ -1,24 +1,20 @@
-import asyncio
-import logging
+import os
 
-from aiogram import Bot, Dispatcher, F, types, Router
+from aiogram import Bot, types, Router
 from aiogram.filters import Command
 from aiogram.filters import BaseFilter, Command
-from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import StatesGroup, State
 from dotenv import load_dotenv
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
-#import keyboards as k
-#import videos as v
 from config import config
-from db import createtables, profile, users
+from db import users
 
 load_dotenv()
 
-admin_ids = [375959767, 505958678, 314310391]
-#, 505958678, 314310391
+admin_ids = os.getenv('ADMINS')
+admin_ids = list(map(int, admin_ids.split(',')))
 router = Router()
 bot = Bot(token=config.bot_token.get_secret_value())
 
